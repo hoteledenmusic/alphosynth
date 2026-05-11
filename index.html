@@ -341,15 +341,41 @@ class Layer {
     this.dly.connect(this.dlyFb);this.dlyFb.connect(this.dly);
     this.dly.connect(this.dlyW);
 
-    // Reverb
-    this.rev=new Reverb(c);
+    // Reverb (Schroeder: 4 combs + 2 allpasses, all connected)
+    this.revOut=this.ctx.createGain();this.revOut.gain.value=0.3;
+    this.revFb=this.ctx.createGain();this.revFb.gain.value=0.5;
+    this.revWet=this.ctx.createGain();this.revWet.gain.value=0.5;
 
-    // Grain LFO (amplitude modulation for grain texture)
-    this.grO=c.createOscillator();this.grO.frequency.value=20;
-    this.grG=c.createGain();this.grG.gain.value=0;
+    // Comb filters (parallel) - stored fb refs
+    this.rc1=this.ctx.createDelay(1);this.rc1.delayTime.value=0.029;
+    this.rc2=this.ctx.createDelay(1);this.rc2.delayTime.value=0.037;
+    this.rc3=this.ctx.createDelay(1);this.rc3.delayTime.value=0.041;
+    this.rc4=this.ctx.createDelay(1);this.rc4.delayTime.value=0.043;
+    this.rc1fb=this.ctx.createGain();this.rc1fb.gain.value=0.7;
+    this.rc2fb=this.ctx.createGain();this.rc2fb.gain.value=0.72;
+    this.rc3fb=this.ctx.createGain();this.rc3fb.gain.value=0.74;
+    this.rc4fb=this.ctx.createGain();this.rc4fb.gain.value=0.76;
+    this.rc1.connect(this.rc1fb);this.rc1fb.connect(this.rc1);
+    this.rc2.connect(this.rc2fb);this.rc2fb.connect(this.rc2);
+    this.rc3.connect(this.rc3fb);this.rc3fb.connect(this.rc3);
+    this.rc4.connect(this.rc4fb);this.rc4fb.connect(this.rc4);
+
+    // Allpass (series)
+    this.ra1=this.ctx.createDelay(1);this.ra1.delayTime.value=0.0031;
+    this.ra2=this.ctx.createDelay(1);this.ra2.delayTime.value=0.005;
+    this.ra1.connect(this.ra2);
+
+    // Sum combs → allpasses → revOut
+    const cs=this.ctx.createGain();cs.gain.value=1;
+    this.rc1fb.connect(cs);this.rc2fb.connect(cs);
+    this.rc3fb.connect(cs);this.rc4fb.connect(cs);
+    cs.connect(this.ra1);
+    this.ra1.connect(this.ra2);this.ra2.connect(this.revOut);
+
+// Grain LFO (amplitude modulation for grain texture)
+    this.grO=this.ctx.createOscillator();this.grO.frequency.value=20;
+    this.grG=this.ctx.createGain();this.grG.gain.value=0;
     this.grO.connect(this.grG);this.grO.start();
-    this.grEnv=c.createGain();this.grEnv.gain.value=0;
-    this.grG.connect(this.grEnv);
 
     // OUTPUT
     this.out=c.createGain();this.out.gain.value=1;
@@ -364,8 +390,8 @@ class Layer {
     this.env.connect(this.dlyD);
     this.env.connect(this.dlyW);
     this.dlyD.connect(this.out);
-    this.dlyW.connect(this.rev.process(this.dlyW));
-    this.rev.connect(this.out);
+    this.dlyW.connect(this.revWet);this.revWet.connect(this.revOut);
+    this.revOut.connect(this.out);
     this.out.connect(this.master);
   }
 
@@ -384,11 +410,10 @@ class Layer {
     this.shaper.frequency.setTargetAtTime(nc*(1+harm*0.5),t,0.05);
     this.shaper.Q.setTargetAtTime(0.5+harm*5,t,0.05);
 
-    // Grain rate
+    // Grain AM
     this.grO.frequency.setTargetAtTime(p[4],t,0.05);
-    const gs=p[3]/200; // grain size modulates AM depth
-    this.grEnv.gain.setTargetAtTime(gs,t,0.05);
-    this.env.connect(this.grEnv); // modulate amp with grain
+    const gs=p[3]/200;
+    this.grG.gain.setTargetAtTime(gs,t,0.05);
 
     // Waveshaper
     this.ws.curve=makeDistCurve(p[10]/100,p[11]);
@@ -422,8 +447,14 @@ class Layer {
     this.dlyW.gain.setTargetAtTime(p[17]/80,t,0.05);
 
     // Reverb
-    this.rev.setDecay(p[18]/100);
-    this.rev.setMix(p[19]/100);
+    const rs=p[18]/100;
+    const cf=0.3+rs*0.65;
+    this.rc1fb.gain.setTargetAtTime(cf,this.ctx.currentTime,0.05);
+    this.rc2fb.gain.setTargetAtTime(cf+0.01,this.ctx.currentTime,0.05);
+    this.rc3fb.gain.setTargetAtTime(cf+0.02,this.ctx.currentTime,0.05);
+    this.rc4fb.gain.setTargetAtTime(cf+0.03,this.ctx.currentTime,0.05);
+    this.revWet.gain.setTargetAtTime(p[19]/100*0.8,this.ctx.currentTime,0.05);
+    this.revOut.gain.setTargetAtTime(0.2+rs*0.6,this.ctx.currentTime,0.05);
   }
 
   _noteOn(vel){
@@ -446,9 +477,9 @@ class Layer {
 
     // Re-trigger LFO for fresh phase
     try{this.lfoO.stop();}catch(e){}
-    this.lfoO=c.createOscillator();this.lfoO.type='sine';
+    this.lfoO=this.ctx.createOscillator();this.lfoO.type='sine';
     this.lfoO.frequency.value=this.p[12];
-    this.lfoG=c.createGain();this.lfoG.gain.value=0;
+    this.lfoG=this.ctx.createGain();this.lfoG.gain.value=0;
     this.lfoO.connect(this.lfoG);this.lfoO.start();
     this.lfoG.connect(this.fltEnv);
     // Reconnect filter FM
@@ -460,11 +491,11 @@ class Layer {
 
     // Re-trigger grain LFO
     try{this.grO.stop();}catch(e){}
-    this.grO=c.createOscillator();
+    this.grO=this.ctx.createOscillator();
     this.grO.frequency.value=this.p[4];
-    this.grG=c.createGain();this.grG.gain.value=this.p[3]/200;
+    this.grG=this.ctx.createGain();this.grG.gain.value=this.p[3]/200;
     this.grO.connect(this.grG);this.grO.start();
-    this.grG.connect(this.grEnv);
+    this.grG.connect(this.env.gain);
   }
 
   _noteOff(){
