@@ -793,17 +793,20 @@ class Alphosynth {
 // ═════════════════════════════════════════════════
 const synth=new Alphosynth();
 window.synth=synth;
-// Hide start screen after click or timeout
-document.getElementById('start-btn').addEventListener('click', () => {
-  const start = document.getElementById('start');
-  start.style.display = 'none';
-  document.getElementById('vis').style.display = 'block';
-});
-setTimeout(() => {
-  const start = document.getElementById('start');
-  if(start) start.style.display = 'none';
-  document.getElementById('vis').style.display = 'block';
-}, 100);
+// Auto-hide start screen and initialize audio
+const start = document.getElementById('start');
+const startBtn = document.getElementById('start-btn');
+if(start && startBtn){
+  startBtn.addEventListener('click', () => {
+    start.style.display = 'none';
+    synth._start();
+  });
+  // Auto-show/hide after page load (100ms delay for browser popup blocker relaxation)
+  setTimeout(() => {
+    if(start) start.style.display = 'none';
+    if(synth) synth._start();
+  }, 100);
+}
 </script>
 </body>
 </html>
