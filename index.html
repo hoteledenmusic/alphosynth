@@ -56,7 +56,7 @@ justify-content:space-between;font-size:9px;color:var(--muted);z-index:197}
 display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-content:start}
 @media(max-width:700px){#main{grid-template-columns:repeat(3,1fr)}}
 
-/* KNOB CELL */
+/* MAIN KNOB AREA */
 .kcell{display:flex;flex-direction:column;align-items:center;padding:6px 2px;gap:3px}
 .knob{cursor:ns-resize;width:54px;height:54px;border-radius:50%;
 background:var(--knob-bg);border:2px solid var(--knob-ring);
@@ -101,8 +101,8 @@ font-size:8px;letter-spacing:1px;padding:4px 6px;text-align:left}
 position:fixed;inset:0;background:var(--bg);z-index:500;gap:20px}
 #start h1{font-size:22px;letter-spacing:12px;font-weight:400}
 #start p{font-size:10px;color:var(--muted);letter-spacing:3px}
-#start-btn{padding:12px 30px;background:var(--accent);border:none;
-color:#fff;font-size:11px;letter-spacing:3px;cursor:pointer;
+#start-btn{padding:12px 30px;background:transparent;border:1px solid var(--accent);
+background:var(--accent);color:#fff;font-size:11px;letter-spacing:3px;cursor:pointer;
 font-family:inherit;transition:opacity .2s}
 #start-btn:hover{opacity:.8}
 </style>
@@ -788,11 +788,22 @@ class Alphosynth {
   }
 }
 
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════════════
 // BOOT
-// ═══════════════════════════════════════════
+// ═════════════════════════════════════════════════
 const synth=new Alphosynth();
 window.synth=synth;
+// Hide start screen after click or timeout
+document.getElementById('start-btn').addEventListener('click', () => {
+  const start = document.getElementById('start');
+  start.style.display = 'none';
+  document.getElementById('vis').style.display = 'block';
+});
+setTimeout(() => {
+  const start = document.getElementById('start');
+  if(start) start.style.display = 'none';
+  document.getElementById('vis').style.display = 'block';
+}, 100);
 </script>
 </body>
 </html>
